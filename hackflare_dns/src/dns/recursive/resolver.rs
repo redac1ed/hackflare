@@ -6,7 +6,7 @@ use std::time::{Duration, Instant};
 
 use super::cache;
 use super::hints;
-use super::message::{build_query, clamp_tld_ttl, extract_ns_and_glue, parse_rrs, tld_from_name};
+use super::message::{build_query, clamp_tld_ttl, extract_ns_and_glue, parse_rrs, tld_from_name, DnsHeader};
 use super::transport::{send_recv, tcp_send_recv};
 
 use cache::{CacheValue, DelegationCacheValue, RootCacheValue};
@@ -163,12 +163,9 @@ fn resolve_internal(
                 resp_opt = tcp_send_recv(srv, &req);
             }
             if let Some(mut resp) = resp_opt {
-                let flags = if resp.len() >= 4 {
-                    u16::from_be_bytes([resp[2], resp[3]])
-                } else {
-                    0
-                };
-                if flags & 0x0200 != 0
+                let truncated = resp.len() >= 12
+                    && DnsHeader::from_wire(&resp).is_some_and(|h| h.is_truncated());
+                if truncated
                     && let Some(tcp_resp) = tcp_send_recv(srv, &req)
                 {
                     resp = tcp_resp;
@@ -180,10 +177,12 @@ fn resolve_internal(
                     );
                     continue;
                 }
-                let ancount = u16::from_be_bytes([resp[6], resp[7]]) as usize;
-                let nscount = u16::from_be_bytes([resp[8], resp[9]]) as usize;
-                #[allow(clippy::similar_names)]
-                let arcount = u16::from_be_bytes([resp[10], resp[11]]) as usize;
+                let Some(header) = DnsHeader::from_wire(&resp) else {
+                    continue;
+                };
+                let ancount = header.ancount as usize;
+                let nscount = header.nscount as usize;
+                let arcount = header.arcount as usize;
                 let mut pos = 12usize;
                 let (_qn, p2) = crate::dns::wire::parse_qname(&resp, pos)?;
                 pos = p2 + 4;
@@ -191,29 +190,29 @@ fn resolve_internal(
                     && let Some(ans_rrs) = parse_rrs(&resp, pos, ancount)
                 {
                     let mut min_ttl: Option<u32> = None;
-                    for (rtype, rpos, _rdlen, ttl) in &ans_rrs {
-                        if *rtype == qtype {
+                    for rr in &ans_rrs {
+                        if rr.rtype == qtype {
                             if let Ok(mut c) = cache::CACHE.lock() {
                                 cache::prune_cache(
                                     &mut c,
                                     MAX_QUERY_CACHE_ENTRIES,
                                     |(_, exp): &CacheValue| Instant::now() >= *exp,
                                 );
-                                let exp = Instant::now() + Duration::from_secs((*ttl).into());
+                                let exp = Instant::now() + Duration::from_secs(u64::from(rr.ttl));
                                 c.insert((name.to_string(), qtype), (resp.clone(), exp));
                             }
                             debug_log(&format!("resolved {name} type {qtype} via {srv}"), config);
                             return Some(resp.clone());
                         }
                         if let Some(mt) = min_ttl {
-                            if *ttl < mt {
-                                min_ttl = Some(*ttl);
+                            if rr.ttl < mt {
+                                min_ttl = Some(rr.ttl);
                             }
                         } else {
-                            min_ttl = Some(*ttl);
+                            min_ttl = Some(rr.ttl);
                         }
-                        if *rtype == 5
-                            && let Some((cname, _)) = crate::dns::wire::parse_qname(&resp, *rpos)
+                        if rr.rtype == 5
+                            && let Some((cname, _)) = crate::dns::wire::parse_qname(&resp, rr.pos)
                         {
                             qname = cname;
                             next_servers.clear();
@@ -224,19 +223,19 @@ fn resolve_internal(
                 let auth_pos = if ancount > 0
                     && let Some(list) = parse_rrs(&resp, pos, ancount)
                 {
-                    list.last().map_or(pos, |(_, p, rd, _)| p + rd)
+                    list.last().map_or(pos, |rr| rr.pos + rr.rdlen)
                 } else {
                     pos
                 };
                 let authority_rrs = parse_rrs(&resp, auth_pos, nscount).unwrap_or_default();
                 let referral_ttl_secs = authority_rrs
                     .iter()
-                    .map(|(_, _, _, ttl)| u64::from(*ttl))
+                    .map(|rr| u64::from(rr.ttl))
                     .min()
                     .unwrap_or(ROOT_CACHE_TTL_SECS);
                 let after_auth = authority_rrs
                     .last()
-                    .map_or(auth_pos, |last| last.1 + last.2);
+                    .map_or(auth_pos, |last| last.pos + last.rdlen);
                 let additional_rrs = parse_rrs(&resp, after_auth, arcount).unwrap_or_default();
                 let (ns_names, glue_ips) =
                     extract_ns_and_glue(&resp, &authority_rrs, &additional_rrs);
@@ -268,14 +267,14 @@ fn resolve_internal(
                                 };
                                 p = p2 + 4;
                                 if let Some(a_rrs) = parse_rrs(&ip_resp, p, an) {
-                                    for (rt, rpos, rdlen, _) in a_rrs {
-                                        if rt == 1 && rdlen == 4 {
+                                    for rr in a_rrs {
+                                        if rr.rtype == 1 && rr.rdlen == 4 {
                                             let ip = format!(
                                                 "{}.{}.{}.{}",
-                                                ip_resp[rpos],
-                                                ip_resp[rpos + 1],
-                                                ip_resp[rpos + 2],
-                                                ip_resp[rpos + 3]
+                                                ip_resp[rr.pos],
+                                                ip_resp[rr.pos + 1],
+                                                ip_resp[rr.pos + 2],
+                                                ip_resp[rr.pos + 3]
                                             );
                                             next_servers.push(ip);
                                         }

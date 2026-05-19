@@ -14,6 +14,45 @@ pub(super) fn clamp_tld_ttl(ttl_secs: u64) -> u64 {
     ttl_secs.clamp(TLD_DELEGATION_MIN_TTL_SECS, TLD_DELEGATION_MAX_TTL_SECS)
 }
 
+#[derive(Debug, Clone, Copy)]
+pub(super) struct RecordInfo {
+    pub rtype: u16,
+    pub pos: usize,
+    pub rdlen: usize,
+    pub ttl: u32,
+}
+
+#[derive(Debug, Clone, Copy)]
+#[allow(dead_code)]
+pub(super) struct DnsHeader {
+    pub id: u16,
+    pub flags: u16,
+    pub qdcount: u16,
+    pub ancount: u16,
+    pub nscount: u16,
+    pub arcount: u16,
+}
+
+impl DnsHeader {
+    pub(super) fn from_wire(buf: &[u8]) -> Option<Self> {
+        if buf.len() < 12 {
+            return None;
+        }
+        Some(Self {
+            id: u16::from_be_bytes([buf[0], buf[1]]),
+            flags: u16::from_be_bytes([buf[2], buf[3]]),
+            qdcount: u16::from_be_bytes([buf[4], buf[5]]),
+            ancount: u16::from_be_bytes([buf[6], buf[7]]),
+            nscount: u16::from_be_bytes([buf[8], buf[9]]),
+            arcount: u16::from_be_bytes([buf[10], buf[11]]),
+        })
+    }
+
+    pub(super) fn is_truncated(&self) -> bool {
+        self.flags & 0x0200 != 0
+    }
+}
+
 pub(super) fn build_query(id: u16, qname: &str, qtype: u16) -> Vec<u8> {
     let mut out = Vec::new();
     out.extend_from_slice(&id.to_be_bytes());
@@ -60,11 +99,7 @@ pub(super) fn response_matches_expected(
     qtype == expected_qtype
 }
 
-pub(super) fn parse_rrs(
-    buf: &[u8],
-    mut pos: usize,
-    count: usize,
-) -> Option<Vec<(u16, usize, usize, u32)>> {
+pub(super) fn parse_rrs(buf: &[u8], mut pos: usize, count: usize) -> Option<Vec<RecordInfo>> {
     let mut out = Vec::with_capacity(count);
     for _ in 0..count {
         let (_, p2) = parse_qname(buf, pos)?;
@@ -83,7 +118,7 @@ pub(super) fn parse_rrs(
         if pos + rdlen > buf.len() {
             return None;
         }
-        out.push((rtype, pos, rdlen, ttl));
+        out.push(RecordInfo { rtype, pos, rdlen, ttl });
         pos += rdlen;
     }
     Some(out)
@@ -91,31 +126,31 @@ pub(super) fn parse_rrs(
 
 pub(super) fn extract_ns_and_glue(
     buf: &[u8],
-    authority_rrs: &[(u16, usize, usize, u32)],
-    additional_rrs: &[(u16, usize, usize, u32)],
+    authority_rrs: &[RecordInfo],
+    additional_rrs: &[RecordInfo],
 ) -> (Vec<String>, Vec<String>) {
     let mut ns_names: Vec<String> = Vec::new();
     let mut glue_ips: Vec<String> = Vec::new();
-    for (rtype, rpos, _rdlen, _ttl) in authority_rrs {
-        if *rtype == 2
-            && let Some((name, _)) = parse_qname(buf, *rpos)
+    for rr in authority_rrs {
+        if rr.rtype == 2
+            && let Some((name, _)) = parse_qname(buf, rr.pos)
         {
             ns_names.push(name);
         }
     }
-    for (rtype, rpos, rdlen, _ttl) in additional_rrs {
-        if *rtype == 1 && *rdlen == 4 {
+    for rr in additional_rrs {
+        if rr.rtype == 1 && rr.rdlen == 4 {
             let ip = format!(
                 "{}.{}.{}.{}",
-                buf[*rpos],
-                buf[*rpos + 1],
-                buf[*rpos + 2],
-                buf[*rpos + 3]
+                buf[rr.pos],
+                buf[rr.pos + 1],
+                buf[rr.pos + 2],
+                buf[rr.pos + 3]
             );
             glue_ips.push(ip);
-        } else if *rtype == 28
-            && *rdlen == 16
-            && let Ok(ipv6) = <[u8; 16]>::try_from(&buf[*rpos..*rpos + 16])
+        } else if rr.rtype == 28
+            && rr.rdlen == 16
+            && let Ok(ipv6) = <[u8; 16]>::try_from(&buf[rr.pos..rr.pos + 16])
         {
             glue_ips.push(std::net::Ipv6Addr::from(ipv6).to_string());
         }
@@ -170,5 +205,32 @@ mod tests {
         rr.extend_from_slice(&[192, 168, 1, 1]);
         let result = parse_rrs(&rr, 0, 1);
         assert!(result.is_none());
+    }
+
+    #[test]
+    fn dns_header_parses_from_wire() {
+        let mut bytes = vec![0u8; 12];
+        bytes[0] = 0x12; bytes[1] = 0x34; // id = 0x1234
+        bytes[2] = 0x81; bytes[3] = 0x80; // flags: QR + RD + RA
+        bytes[4] = 0x00; bytes[5] = 0x01; // qdcount = 1
+        bytes[6] = 0x00; bytes[7] = 0x02; // ancount = 2
+        let hdr = DnsHeader::from_wire(&bytes).unwrap();
+        assert_eq!(hdr.id, 0x1234);
+        assert_eq!(hdr.qdcount, 1);
+        assert_eq!(hdr.ancount, 2);
+        assert!(!hdr.is_truncated());
+    }
+
+    #[test]
+    fn dns_header_detects_truncation() {
+        let mut bytes = vec![0u8; 12];
+        bytes[2] = 0x02; bytes[3] = 0x00; // TC bit set
+        let hdr = DnsHeader::from_wire(&bytes).unwrap();
+        assert!(hdr.is_truncated());
+    }
+
+    #[test]
+    fn dns_header_rejects_short_buffer() {
+        assert!(DnsHeader::from_wire(&[0u8; 11]).is_none());
     }
 }

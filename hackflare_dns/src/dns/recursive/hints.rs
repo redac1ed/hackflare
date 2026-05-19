@@ -1,9 +1,9 @@
 use std::env;
 use std::fs;
 use std::net::Ipv4Addr;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 
-pub(super) const ROOT_SERVERS: [&str; 13] = [
+const ROOT_SERVERS: [&str; 13] = [
     "198.41.0.4",
     "170.247.170.2",
     "192.33.4.12",
@@ -19,7 +19,7 @@ pub(super) const ROOT_SERVERS: [&str; 13] = [
     "202.12.27.33",
 ];
 
-pub(super) fn parse_root_hints(content: &str) -> Vec<String> {
+fn parse_root_hints(content: &str) -> Vec<String> {
     let mut ips = Vec::new();
     for line in content.lines() {
         let trimmed = line.trim();
@@ -37,7 +37,7 @@ pub(super) fn parse_root_hints(content: &str) -> Vec<String> {
     ips
 }
 
-pub(super) fn root_hints_content() -> String {
+fn root_hints_content() -> String {
     let mut out = String::from("; Auto-generated root hints by Hackflare\n");
     for ip in ROOT_SERVERS {
         out.push_str(ip);
@@ -74,13 +74,7 @@ fn try_create_root_hints_file(path: &str) -> bool {
     fs::write(p, root_hints_content()).is_ok()
 }
 
-pub(super) fn load_root_hint_servers() -> Vec<String> {
-    load_root_hint_servers_internal(None)
-}
-
-pub(super) fn load_root_hint_servers_internal(
-    custom_path: Option<&std::path::PathBuf>,
-) -> Vec<String> {
+fn load_root_hint_servers_internal(custom_path: Option<&PathBuf>) -> Vec<String> {
     if let Some(path) = custom_path
         && let Ok(content) = fs::read_to_string(path)
     {
@@ -113,6 +107,22 @@ pub(super) fn load_root_hint_servers_internal(
     }
 
     ROOT_SERVERS.iter().map(|&s| s.to_string()).collect()
+}
+
+pub(super) struct RootHints {
+    servers: Vec<String>,
+}
+
+impl RootHints {
+    pub(super) fn load() -> Self {
+        Self {
+            servers: load_root_hint_servers_internal(None),
+        }
+    }
+
+    pub(super) fn servers(&self) -> &[String] {
+        &self.servers
+    }
 }
 
 #[cfg(test)]

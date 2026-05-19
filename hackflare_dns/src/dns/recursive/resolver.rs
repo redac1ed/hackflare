@@ -13,8 +13,8 @@ const MAX_CONCURRENT_RESOLVES: usize = 128;
 static ACTIVE_RESOLVES: std::sync::LazyLock<AtomicUsize> =
     std::sync::LazyLock::new(|| AtomicUsize::new(0));
 
-static ROOT_HINTS: std::sync::LazyLock<Vec<String>> =
-    std::sync::LazyLock::new(hints::load_root_hint_servers);
+static ROOT_HINTS: std::sync::LazyLock<hints::RootHints> =
+    std::sync::LazyLock::new(hints::RootHints::load);
 
 fn debug_log(msg: &str, config: &DnsConfig) {
     if config.recursion_debug {
@@ -70,7 +70,7 @@ fn resolve_internal(
     let _resolve_guard = acquire_resolve_slot()?;
     let transport = UdpTransport::bind(config.udp_timeout)?;
 
-    cache::CACHE.seed_root_cache(&ROOT_HINTS, ROOT_CACHE_TTL_SECS);
+    cache::CACHE.seed_root_cache(ROOT_HINTS.servers(), ROOT_CACHE_TTL_SECS);
 
     if let Some(data) = cache::CACHE.get_query(name, qtype) {
         return Some(data);
@@ -82,7 +82,7 @@ fn resolve_internal(
         .as_ref()
         .and_then(|tld| cache::CACHE.get_delegation(tld))
         .or_else(|| cache::CACHE.get_root_glue())
-        .unwrap_or_else(|| ROOT_HINTS.clone());
+        .unwrap_or_else(|| ROOT_HINTS.servers().to_vec());
 
     if servers.len() > MAX_UPSTREAM_SERVERS_PER_ROUND {
         servers.truncate(MAX_UPSTREAM_SERVERS_PER_ROUND);
@@ -240,14 +240,14 @@ fn resolve_internal(
         if next_servers.is_empty()
             && !tried_root_fallback
             && !servers.is_empty()
-            && servers != *ROOT_HINTS
+            && servers.as_slice() != ROOT_HINTS.servers()
         {
             tried_root_fallback = true;
-            servers.clone_from(&ROOT_HINTS);
+            servers = ROOT_HINTS.servers().to_vec();
             continue;
         }
 
-        if next_servers.is_empty() && servers == *ROOT_HINTS {
+        if next_servers.is_empty() && servers.as_slice() == ROOT_HINTS.servers() {
             tried_root_fallback = true;
         }
     }

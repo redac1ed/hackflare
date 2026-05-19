@@ -1,40 +1,35 @@
-name: CodeQL
+name: Daily Checks
 
 on:
   schedule:
     - cron: "0 6 * * *"
-  push:
-    branches: [main]
-    paths:
-      - "frontend/**"
-      - "hackflare_api/**"
-      - "hackflare_dns/**"
-      - "Cargo.toml"
-      - "Cargo.lock"
-      - ".github/workflows/codeql.yml"
-  pull_request:
-    branches: [main]
-    paths:
-      - "frontend/**"
-      - "hackflare_api/**"
-      - "hackflare_dns/**"
-      - "Cargo.toml"
-      - "Cargo.lock"
-      - ".github/workflows/codeql.yml"
   workflow_dispatch:
 
 concurrency:
-  group: ${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: true
+  group: ${{ github.workflow }}
+  cancel-in-progress: false
 
 jobs:
-  analyze:
+  audit:
+    runs-on: blacksmith-4vcpu-ubuntu-2404
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Install cargo-audit
+        run: cargo install cargo-audit --locked
+
+      - name: Run audit
+        run: cargo audit --deny warnings
+
+  codeql:
     runs-on: blacksmith-8vcpu-ubuntu-2404
     permissions:
       security-events: write
       actions: read
       contents: read
-
     steps:
       - uses: actions/checkout@v6
 

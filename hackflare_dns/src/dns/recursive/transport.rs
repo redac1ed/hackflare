@@ -13,6 +13,65 @@ fn socket_target(addr: &str) -> String {
     }
 }
 
+pub(super) struct UdpTransport {
+    sock: UdpSocket,
+}
+
+impl UdpTransport {
+    pub(super) fn bind(timeout: Duration) -> Option<Self> {
+        let sock = UdpSocket::bind(("0.0.0.0", 0)).ok()?;
+        let _ = sock.set_read_timeout(Some(timeout));
+        Some(Self { sock })
+    }
+
+    pub(super) fn send_recv(
+        &self,
+        addr: &str,
+        msg: &[u8],
+        qid: u16,
+        qname: &str,
+        qtype: u16,
+        config: &DnsConfig,
+    ) -> Option<Vec<u8>> {
+        let target = socket_target(addr);
+        let expected_ip: IpAddr = addr.parse().ok()?;
+        let mut buf = [0u8; 4096];
+        let attempts = config.udp_attempts.max(1);
+        let timeout = config.udp_timeout;
+
+        for _ in 0..attempts {
+            let _ = self.sock.send_to(msg, &target).ok()?;
+            let deadline = Instant::now() + timeout;
+
+            loop {
+                if Instant::now() >= deadline {
+                    break;
+                }
+                match self.sock.recv_from(&mut buf) {
+                    Ok((amt, src)) => {
+                        if src.port() != 53 || src.ip() != expected_ip {
+                            continue;
+                        }
+                        let candidate = &buf[..amt];
+                        if response_matches_expected(candidate, qid, qname, qtype) {
+                            return Some(candidate.to_vec());
+                        }
+                    }
+                    Err(ref e)
+                        if e.kind() == std::io::ErrorKind::WouldBlock
+                            || e.kind() == std::io::ErrorKind::TimedOut =>
+                    {
+                        break;
+                    }
+                    Err(_) => break,
+                }
+            }
+        }
+
+        None
+    }
+}
+
 pub(super) fn tcp_send_recv(addr: &str, msg: &[u8]) -> Option<Vec<u8>> {
     let target = socket_target(addr);
     let sockaddr = target.parse().ok()?;
@@ -38,61 +97,6 @@ pub(super) fn tcp_send_recv(addr: &str, msg: &[u8]) -> Option<Vec<u8>> {
         return None;
     }
     Some(buf)
-}
-
-fn udp_attempts_per_server(config: &DnsConfig) -> usize {
-    config.udp_attempts.max(1)
-}
-
-fn udp_attempt_timeout(config: &DnsConfig) -> Duration {
-    config.udp_timeout
-}
-
-pub(super) fn send_recv(
-    sock: &UdpSocket,
-    addr: &str,
-    msg: &[u8],
-    qid: u16,
-    qname: &str,
-    qtype: u16,
-    config: &DnsConfig,
-) -> Option<Vec<u8>> {
-    let target = socket_target(addr);
-    let expected_ip: IpAddr = addr.parse().ok()?;
-    let mut buf = [0u8; 4096];
-    let attempts = udp_attempts_per_server(config);
-    let timeout = udp_attempt_timeout(config);
-
-    for _ in 0..attempts {
-        let _ = sock.send_to(msg, &target).ok()?;
-        let deadline = Instant::now() + timeout;
-
-        loop {
-            if Instant::now() >= deadline {
-                break;
-            }
-            match sock.recv_from(&mut buf) {
-                Ok((amt, src)) => {
-                    if src.port() != 53 || src.ip() != expected_ip {
-                        continue;
-                    }
-                    let candidate = &buf[..amt];
-                    if response_matches_expected(candidate, qid, qname, qtype) {
-                        return Some(candidate.to_vec());
-                    }
-                }
-                Err(ref e)
-                    if e.kind() == std::io::ErrorKind::WouldBlock
-                        || e.kind() == std::io::ErrorKind::TimedOut =>
-                {
-                    break;
-                }
-                Err(_) => break,
-            }
-        }
-    }
-
-    None
 }
 
 #[cfg(test)]

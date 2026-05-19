@@ -1,12 +1,11 @@
 use crate::dns::DnsConfig;
 use rand::seq::SliceRandom;
-use std::net::UdpSocket;
 use std::sync::atomic::{AtomicUsize, Ordering};
 
 use super::cache::{self, ROOT_CACHE_TTL_SECS};
 use super::hints;
 use super::message::{build_query, clamp_tld_ttl, extract_ns_and_glue, parse_rrs, tld_from_name, DnsHeader};
-use super::transport::{send_recv, tcp_send_recv};
+use super::transport::{tcp_send_recv, UdpTransport};
 
 const MAX_UPSTREAM_SERVERS_PER_ROUND: usize = 8;
 const MAX_CONCURRENT_RESOLVES: usize = 128;
@@ -69,8 +68,7 @@ fn resolve_internal(
         return None;
     }
     let _resolve_guard = acquire_resolve_slot()?;
-    let sock = UdpSocket::bind(("0.0.0.0", 0)).ok()?;
-    let _ = sock.set_read_timeout(Some(config.udp_timeout));
+    let transport = UdpTransport::bind(config.udp_timeout)?;
 
     cache::CACHE.seed_root_cache(&ROOT_HINTS, ROOT_CACHE_TTL_SECS);
 
@@ -101,7 +99,7 @@ fn resolve_internal(
             round_servers.truncate(MAX_UPSTREAM_SERVERS_PER_ROUND);
         }
         for srv in &round_servers {
-            let mut resp_opt = send_recv(&sock, srv, &req, qid, &qname, qtype, config);
+            let mut resp_opt = transport.send_recv(srv, &req, qid, &qname, qtype, config);
             if resp_opt.is_none() {
                 resp_opt = tcp_send_recv(srv, &req);
             }

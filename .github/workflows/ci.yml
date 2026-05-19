@@ -32,6 +32,20 @@ jobs:
   api:
     name: API Checks
     runs-on: blacksmith-4vcpu-ubuntu-2404
+    services:
+      postgres:
+        image: postgres:18
+        env:
+          POSTGRES_PASSWORD: hackflare
+          POSTGRES_USER: hackflare
+          POSTGRES_DB: hackflare
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
     defaults:
       run:
         working-directory: hackflare_api
@@ -57,6 +71,24 @@ jobs:
 
       - name: Run tests
         run: cargo test --all-features
+
+      - name: Install sqlx-cli
+        working-directory: .
+        run: cargo install sqlx-cli --no-default-features --features postgres,rustls
+
+      - name: Run migrations
+        working-directory: .
+        run: cargo sqlx migrate run
+        env:
+          DATABASE_URL: postgres://hackflare:hackflare@localhost:5432/hackflare
+          SQLX_OFFLINE: false
+
+      - name: Check offline query files
+        working-directory: .
+        run: cargo sqlx prepare --check
+        env:
+          DATABASE_URL: postgres://hackflare:hackflare@localhost:5432/hackflare
+          SQLX_OFFLINE: false
   dns:
     name: DNS Checks
     runs-on: blacksmith-4vcpu-ubuntu-2404
@@ -113,3 +145,18 @@ jobs:
 
       - name: Format check
         run: npx prettier --check "**/*.{ts,tsx}"
+
+  audit:
+    name: Dependency Audit
+    runs-on: blacksmith-4vcpu-ubuntu-2404
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Install cargo-audit
+        run: cargo install cargo-audit --locked
+
+      - name: Run audit
+        run: cargo audit --deny warnings

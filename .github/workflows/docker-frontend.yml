@@ -30,12 +30,7 @@ jobs:
         uses: useblacksmith/setup-docker-builder@v1
 
       - name: Build Docker image (smoke test)
-        uses: useblacksmith/build-push-action@v2
-        with:
-          context: ./frontend
-          file: Dockerfile
-          platforms: linux/amd64
-          push: false
+        run: docker build -t hackflare-frontend-test ./frontend
 
   publish:
     if: github.event.pull_request.merged == true || github.event_name == 'workflow_dispatch' || github.event_name == 'workflow_call'

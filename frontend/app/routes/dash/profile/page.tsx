@@ -44,9 +44,9 @@ export default function Profile() {
   const displayName = getUserDisplayName(user)
   const email = user?.email || "Unknown"
   const slackId = user?.slack_id || "Unknown"
-  const verificationStatus = user ? "Verified through Hack Club" : "Unknown"
+  const verificationStatus = user?.slack_id ? "Verified" : "Not verified"
   const accountStatus = user?.eligible
-    ? "Eligible for Hackflare"
+    ? "Active"
     : "Not eligible"
   const initials = displayName
     .split(" ")
@@ -88,6 +88,11 @@ export default function Profile() {
                 alt={userLabel}
                 className="lounded-lg object-cover"
               />
+              <AvatarImage
+                src={avatar}
+                alt={userLabel}
+                className="lounded-lg object-cover"
+              />
               <AvatarFallback className="rounded-xl bg-orange-500 text-lg font-semibold text-white">
                 {initials}
               </AvatarFallback>
@@ -104,14 +109,18 @@ export default function Profile() {
                   Email
                 </p>
                 <p className="mt-1 text-sm font-medium">{email}</p>
+                <p className="mt-1 text-sm font-medium">{email}</p>
               </div>
               <div>
                 <p className="text-xs font-medium text-zinc-600 dark:text-zinc-400">
                   Slack ID
                 </p>
                 <p className="mt-1 text-sm font-medium">{slackId}</p>
+                <p className="mt-1 text-sm font-medium">{slackId}</p>
               </div>
               <div className="flex gap-2 pt-2">
+                <Button variant="outline">Edit Profile</Button>
+                <Button onClick={handleLogout} variant="destructive"/>
                 <Button variant="outline">Edit Profile</Button>
                 <Button onClick={handleLogout} variant="destructive">
                   <LogOut className="h-4 w-4" />
@@ -172,6 +181,9 @@ export default function Profile() {
               <Clock className="h-5 w-5" />
               Account Status
             </CardTitle>
+            <CardDescription>
+              Derived from the current user record
+            </CardDescription>
             <CardDescription>
               Derived from the current user record
             </CardDescription>

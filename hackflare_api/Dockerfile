@@ -32,4 +32,6 @@ FROM alpine:3.20
 # Install CA certificates for HTTPS support and ensure proper /etc filesystem for DNS
 RUN apk add --no-cache ca-certificates
 COPY --from=builder /hackflare-api /hackflare-api
+ENV MIGRATIONS_PATH=/app/migrations
+COPY --from=builder /app/migrations /app/migrations
 ENTRYPOINT ["/hackflare-api"]

@@ -145,6 +145,5 @@ jobs:
             TAG_PART="${TAG##*:}"
             docker buildx imagetools create \
               -t "$TAG" \
-              "$IMAGE:${TAG_PART}-amd64" \
-              "$IMAGE:${TAG_PART}-arm64"
+              "$IMAGE:${TAG_PART}-amd64"
           done <<< "$TAGS"

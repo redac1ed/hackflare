@@ -1,4 +1,4 @@
-use std::{sync::Arc, time::Duration};
+use std::{path::Path, sync::Arc, time::Duration};
 
 use anyhow::Result;
 use axum::extract::FromRef;
@@ -17,8 +17,6 @@ use crate::{
     services::{user_sessions::UserSessionsService, users::UsersService},
 };
 
-static MIGRATOR: Migrator = sqlx::migrate!("../migrations");
-
 #[derive(Clone, FromRef)]
 pub struct AppState {
     pub config: Arc<Config>,
@@ -35,8 +33,12 @@ pub struct AppState {
 
 #[instrument(skip(db))]
 async fn migrate_or_verify(db: &PgPool, config: &Config) -> Result<()> {
+    let migrations_path =
+        std::env::var("MIGRATIONS_PATH").unwrap_or_else(|_| "../migrations".to_string());
+    let migrator = Migrator::new(Path::new(&migrations_path)).await?;
+
     if config.auto_migrate {
-        MIGRATOR.run(db).await?;
+        migrator.run(db).await?;
     } else {
         let mut conn = db.acquire().await?;
 
@@ -56,7 +58,7 @@ async fn migrate_or_verify(db: &PgPool, config: &Config) -> Result<()> {
 
         debug!("number of applied migrations: {}", applied_map.len());
 
-        for migration in MIGRATOR.iter() {
+        for migration in migrator.iter() {
             if migration.migration_type.is_down_migration() {
                 continue;
             }
@@ -78,14 +80,14 @@ async fn migrate_or_verify(db: &PgPool, config: &Config) -> Result<()> {
         }
 
         if applied_map.len()
-            > MIGRATOR
+            > migrator
                 .migrations
                 .iter()
                 .filter(|m| !m.migration_type.is_down_migration())
                 .count()
         {
             for applied_version in applied_map.keys() {
-                if !MIGRATOR
+                if !migrator
                     .migrations
                     .iter()
                     .any(|m| m.version == *applied_version)

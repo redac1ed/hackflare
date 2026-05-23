@@ -35,9 +35,6 @@ jobs:
           #- platform: linux/arm64
           #  runs-on: blacksmith-4vcpu-ubuntu-2404
     runs-on: ${{ matrix.runs-on }}
-    concurrency:
-      group: build-check-backend-${{ github.ref }}-${{ matrix.platform }}
-      cancel-in-progress: true
     steps:
       - name: Checkout repository
         uses: actions/checkout@v6

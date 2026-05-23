@@ -105,7 +105,7 @@ jobs:
 
   merge-manifest:
     if: github.event.pull_request.merged == true || github.event_name == 'workflow_dispatch' || github.event_name == 'workflow_call'
-    needs: build-and-push
+    needs: publish
     runs-on: blacksmith-4vcpu-ubuntu-2404
     permissions:
       contents: read

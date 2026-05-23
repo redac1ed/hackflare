@@ -11,10 +11,6 @@ on:
       - 'frontend/**'
       - '.github/workflows/docker-frontend.yml'
 
-concurrency:
-      group: frontend-${{ github.ref }}-${{ matrix.platform }}
-      cancel-in-progress: true
-
 env:
   REGISTRY: ghcr.io
   IMAGE_NAME: hack-flare/hackflare-frontend

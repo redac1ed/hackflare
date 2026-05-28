@@ -106,7 +106,7 @@ jobs:
   merge-manifest:
     if: github.event.pull_request.merged == true || github.event_name == 'workflow_dispatch' || github.event_name == 'workflow_call'
     needs: publish
-    runs-on: blacksmith-4vcpu-ubuntu-2404
+    runs-on: ubuntu-latest
     permissions:
       contents: read
       packages: write
@@ -147,7 +147,7 @@ jobs:
           done <<< "$TAGS"
   coolify-webhook:
     needs: merge-manifest
-    runs-on: blacksmith-4vcpu-ubuntu-2404
+    runs-on: ubuntu-latest
     steps:
       - name: Deploy to Coolify
         run: |

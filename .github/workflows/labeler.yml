@@ -10,9 +10,7 @@ permissions:
 
 jobs:
   label:
-    # Its a 32vcpu runner as its funny. That is the only reason. To be honest it makes no difference
-    # It just goes through a tiny bit of the free 3k minutes anyway.
-    runs-on: blacksmith-32vcpu-ubuntu-2404
+    runs-on: ubuntu-latest
     steps:
       - uses: actions/labeler@v6
         with:

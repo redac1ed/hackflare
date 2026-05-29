@@ -11,6 +11,7 @@ RUN cargo chef prepare --recipe-path recipe.json
 FROM chef AS builder
 ENV SQLX_OFFLINE=true
 ENV SQLX_OFFLINE_DIR=database/.sqlx
+
 COPY --from=planner /app/recipe.json recipe.json
 ARG TARGETPLATFORM
 RUN case "$TARGETPLATFORM" in \

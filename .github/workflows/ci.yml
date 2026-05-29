@@ -71,16 +71,17 @@ jobs:
         run: cargo install sqlx-cli --no-default-features --features postgres,rustls
 
       - name: Run migrations
-        run: cargo sqlx migrate run
+        run: cargo sqlx migrate run --migration-dir database/migrations
         env:
           DATABASE_URL: postgres://hackflare:hackflare@localhost:5432/hackflare
           SQLX_OFFLINE: false
 
       - name: Check offline query files
-        run: cargo sqlx prepare --check --workspace
+        run: cargo sqlx prepare --check --workspace --migration-dir database/migrations
         env:
           DATABASE_URL: postgres://hackflare:hackflare@localhost:5432/hackflare
           SQLX_OFFLINE: false
+          SQLX_OFFLINE_DIR: database/.sqlx
 
   frontend:
     name: Frontend Checks

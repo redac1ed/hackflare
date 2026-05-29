@@ -34,7 +34,7 @@ pub struct AppState {
 #[instrument(skip(db))]
 async fn migrate_or_verify(db: &PgPool, config: &Config) -> Result<()> {
     let migrations_path =
-        std::env::var("MIGRATIONS_PATH").unwrap_or_else(|_| "../migrations".to_string());
+        std::env::var("MIGRATIONS_PATH").unwrap_or_else(|_| "../database/migrations".to_string());
     let migrator = Migrator::new(Path::new(&migrations_path)).await?;
 
     if config.auto_migrate {

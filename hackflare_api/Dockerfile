@@ -10,6 +10,7 @@ RUN cargo chef prepare --recipe-path recipe.json
 
 FROM chef AS builder
 ENV SQLX_OFFLINE=true
+ENV SQLX_OFFLINE_DIR=database/.sqlx
 COPY --from=planner /app/recipe.json recipe.json
 ARG TARGETPLATFORM
 RUN case "$TARGETPLATFORM" in \
@@ -33,5 +34,5 @@ FROM alpine:3.20
 RUN apk add --no-cache ca-certificates
 COPY --from=builder /hackflare-api /hackflare-api
 ENV MIGRATIONS_PATH=/app/migrations
-COPY --from=builder /app/migrations /app/migrations
+COPY --from=builder /app/database/migrations /app/migrations
 ENTRYPOINT ["/hackflare-api"]

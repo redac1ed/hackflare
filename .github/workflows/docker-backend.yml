@@ -10,7 +10,7 @@ on:
     paths:
       - 'hackflare_api/**'
       - 'hackflare_dns/**'
-      - 'migrations/**'
+      - 'database/migrations/**'
       - 'Cargo.toml'
       - '.github/workflows/docker-backend.yml'
       - '.dockerignore'

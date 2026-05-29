@@ -11,7 +11,7 @@ on:
       - 'frontend/**'
       - 'hackflare_api/**'
       - 'hackflare_dns/**'
-      - 'migrations/**'
+      - 'database/migrations/**'
       - 'Cargo.toml'
       - 'deployment/Dockerfile.combined'
       - 'deployment/hackflare_supervisord.conf'

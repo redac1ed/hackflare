@@ -135,7 +135,7 @@ export const api = {
       }),
 
     verifyZone: (zoneName: string) =>
-      request<{ verified: boolean }>(
+      request<{ verified: boolean; message?: string }>(
         `/api/v1/dns/zones/${encodeURIComponent(zoneName)}/verify`,
         { method: "POST" }
       ),

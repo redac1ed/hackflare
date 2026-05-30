@@ -38,6 +38,8 @@ export default function Domains() {
   const [domainInput, setDomainInput] = useState("")
   const [adding, setAdding] = useState(false)
   const [addError, setAddError] = useState<string | null>(null)
+  const [verifying, setVerifying] = useState<Record<string, boolean>>({})
+  const [verifyMsg, setVerifyMsg] = useState<Record<string, string>>({})
 
   const fetchZones = async () => {
     setLoading(true)
@@ -79,6 +81,28 @@ export default function Domains() {
       setAddError(msg)
     } finally {
       setAdding(false)
+    }
+  }
+
+  const handleVerify = async (zoneName: string) => {
+    setVerifying((prev) => ({ ...prev, [zoneName]: true }))
+    setVerifyMsg((prev) => ({ ...prev, [zoneName]: "" }))
+    try {
+      const result = await api.dns.verifyZone(zoneName)
+      setVerifyMsg((prev) => ({
+        ...prev,
+        [zoneName]: result.verified
+          ? "Verified!"
+          : result.message || "Verification failed",
+      }))
+    } catch (err) {
+      const msg =
+        err && typeof err === "object" && "error" in err
+          ? String((err as { error: unknown }).error)
+          : "Verification request failed"
+      setVerifyMsg((prev) => ({ ...prev, [zoneName]: msg }))
+    } finally {
+      setVerifying((prev) => ({ ...prev, [zoneName]: false }))
     }
   }
 
@@ -265,15 +289,37 @@ export default function Domains() {
                         </TableCell>
                         <TableCell className="text-zinc-400">—</TableCell>
                         <TableCell>
-                          <span
-                            className={`rounded px-2 py-1 text-xs font-medium ${
-                              zone.ns_verified
-                                ? "border border-green-700 bg-green-900/30 text-green-400"
-                                : "border border-orange-700 bg-orange-900/30 text-orange-400"
-                            }`}
-                          >
-                            {zone.ns_verified ? "Verified" : "Pending"}
-                          </span>
+                          <div className="flex items-center gap-2">
+                            <span
+                              className={`rounded px-2 py-1 text-xs font-medium ${
+                                zone.ns_verified
+                                  ? "border border-green-700 bg-green-900/30 text-green-400"
+                                  : "border border-orange-700 bg-orange-900/30 text-orange-400"
+                              }`}
+                            >
+                              {zone.ns_verified ? "Verified" : "Pending"}
+                            </span>
+                            {!zone.ns_verified && (
+                              <Button
+                                size="sm"
+                                variant="ghost"
+                                className="h-7 px-2 text-xs text-orange-400 hover:text-orange-300"
+                                onClick={() => handleVerify(zone.name)}
+                                disabled={verifying[zone.name]}
+                              >
+                                {verifying[zone.name] ? (
+                                  <Loader2 className="h-3 w-3 animate-spin" />
+                                ) : (
+                                  "Verify"
+                                )}
+                              </Button>
+                            )}
+                            {verifyMsg[zone.name] && (
+                              <span className="text-xs text-zinc-500 max-w-40 truncate">
+                                {verifyMsg[zone.name]}
+                              </span>
+                            )}
+                          </div>
                         </TableCell>
                       </TableRow>
                     ))

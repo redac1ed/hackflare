@@ -108,6 +108,8 @@ function getErrorMessage(status: number): string {
       return "Page not found"
     case 500:
       return "Server error"
+    case 502:
+      return "Backend unreachable"
     case 503:
       return "Service unavailable"
     case 401:
@@ -125,6 +127,8 @@ function getErrorDetails(status: number): string {
       return "The page you're looking for doesn't exist."
     case 500:
       return "Something went wrong on our end. We're working to fix it."
+    case 502:
+      return "The API server is not responding. The backend may be down or restarting."
     case 503:
       return "The service is temporarily unavailable. Please try again later."
     case 401:

@@ -24,6 +24,14 @@ app.use(
     target: API_PROXY_TARGET,
     changeOrigin: true,
     pathFilter: "/api",
+    on: {
+      error: (err, req, res) => {
+        console.error("[proxy] backend unreachable:", err.message)
+        res
+          .status(502)
+          .json({ error: "Backend unreachable", detail: err.message })
+      },
+    },
   })
 )
 

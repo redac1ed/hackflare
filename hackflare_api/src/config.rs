@@ -164,8 +164,8 @@ pub fn from_env() -> Result<Config> {
         slack_webhook_url: env::var("SLACK_WEBHOOK_URL").ok().map(|u| {
             Url::parse(&u).unwrap_or_else(|e| {
                 warn!("invalid SLACK_WEBHOOK_URL: {e}");
-                // Use a placeholder so it doesn't crash — the endpoint will return 500
-                Url::parse("https://hooks.slack.com/services/placeholder").unwrap()
+                Url::parse("https://hooks.slack.com/services/placeholder")
+                    .expect("hardcoded placeholder url is valid")
             })
         }),
         session_inactivity_minutes: env_or("API_SESSION_INACTIVITY_MINUTES", 15i64)?,

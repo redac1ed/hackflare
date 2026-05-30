@@ -46,33 +46,32 @@ pub(crate) async fn auth_middleware(
         .headers()
         .get("Authorization")
         .and_then(|v| v.to_str().ok())
+        && let Some(raw_key) = auth_header.strip_prefix("Bearer ")
     {
-        if let Some(raw_key) = auth_header.strip_prefix("Bearer ") {
-            let key = api_keys.find_by_key(raw_key).await.map_err(|error| {
-                error!(%error, "failed to lookup api key");
+        let key = api_keys.find_by_key(raw_key).await.map_err(|error| {
+            error!(%error, "failed to lookup api key");
+            (StatusCode::INTERNAL_SERVER_ERROR, "db_error")
+        })?;
+
+        if let Some(api_key) = key {
+            let user = users.get_by_id(&api_key.user_id).await.map_err(|error| {
+                error!(%error, "failed to get user");
                 (StatusCode::INTERNAL_SERVER_ERROR, "db_error")
             })?;
 
-            if let Some(api_key) = key {
-                let user = users.get_by_id(&api_key.user_id).await.map_err(|error| {
-                    error!(%error, "failed to get user");
-                    (StatusCode::INTERNAL_SERVER_ERROR, "db_error")
-                })?;
+            let Some(user) = user else {
+                warn!("api key valid but no user exists");
+                return Err((StatusCode::UNAUTHORIZED, "unauthorized"));
+            };
 
-                let Some(user) = user else {
-                    warn!("api key valid but no user exists");
-                    return Err((StatusCode::UNAUTHORIZED, "unauthorized"));
-                };
+            // Update last_used_at in background
+            let _ = api_keys.update_last_used(api_key.id).await;
 
-                // Update last_used_at in background
-                let _ = api_keys.update_last_used(api_key.id).await;
-
-                let session = virtual_session_for_api_key(&api_key);
-                let user = CurrentUser { session, user };
-                req.extensions_mut().insert(user);
-                debug!("api key auth succeeded");
-                return Ok(next.run(req).await);
-            }
+            let session = virtual_session_for_api_key(&api_key);
+            let user = CurrentUser { session, user };
+            req.extensions_mut().insert(user);
+            debug!("api key auth succeeded");
+            return Ok(next.run(req).await);
         }
     }
 

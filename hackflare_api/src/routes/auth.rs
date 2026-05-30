@@ -314,7 +314,7 @@ async fn callback_handler(
     })?;
 
     let (access_token, refresh_token) =
-        make_tokens(&config, jit, &user_info.id, now).map_err(|e| e)?;
+        make_tokens(&config, jit, &user_info.id, now)?;
 
     let is_secure = config.hca.is_secure();
     let access_cookie = make_cookie(
@@ -355,16 +355,16 @@ async fn logout_handler(
 ) -> Response {
     let is_secure = state.config.hca.is_secure();
 
-    if let Some(jwt) = jar.get("jwt") {
-        if let Ok(data) = jsonwebtoken::decode::<JwtClaims>(
+    if let Some(jwt) = jar.get("jwt")
+        && let Ok(data) = jsonwebtoken::decode::<JwtClaims>(
             jwt.value(),
             &state.config.jwt_decoding_key,
             &Validation::default(),
-        ) {
-            let jit = data.claims.jit;
-            if let Err(e) = sessions.revoke(&jit).await {
-                error!(%e, "failed to revoke session");
-            }
+        )
+    {
+        let jit = data.claims.jit;
+        if let Err(e) = sessions.revoke(&jit).await {
+            error!(%e, "failed to revoke session");
         }
     }
 
@@ -425,7 +425,7 @@ async fn refresh_handler(
 
     let now = Utc::now();
     let (access_token, refresh_token) =
-        make_tokens(&config, claims.jit, &claims.sub, now).map_err(|e| e)?;
+        make_tokens(&config, claims.jit, &claims.sub, now)?;
 
     let is_secure = config.hca.is_secure();
     let access_cookie = make_cookie(

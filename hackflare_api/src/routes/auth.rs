@@ -323,7 +323,9 @@ pub(super) fn routes(config: &Config) -> Router<AppState> {
 
     let session_store = MemoryStore::default();
     let session_layer = SessionManagerLayer::new(session_store)
-        .with_expiry(Expiry::OnInactivity(cookie::time::Duration::minutes(config.session_inactivity_minutes)))
+        .with_expiry(Expiry::OnInactivity(cookie::time::Duration::minutes(
+            config.session_inactivity_minutes,
+        )))
         .with_secure(is_secure)
         .with_same_site(SameSite::Lax);
 

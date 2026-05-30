@@ -182,9 +182,11 @@ async fn verify_zone(
     let matched: Vec<&str> = ns_targets
         .iter()
         .map(|t| t.trim_end_matches('.'))
-        .filter(|target| ns_names.iter().any(|ns| {
-            ns.trim_end_matches('.').eq_ignore_ascii_case(target)
-        }))
+        .filter(|target| {
+            ns_names
+                .iter()
+                .any(|ns| ns.trim_end_matches('.').eq_ignore_ascii_case(target))
+        })
         .collect();
 
     if !matched.is_empty() {

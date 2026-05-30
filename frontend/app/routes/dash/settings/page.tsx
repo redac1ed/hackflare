@@ -1,3 +1,13 @@
+import { useCallback, useEffect, useState } from "react"
+import {
+  Bell,
+  Copy,
+  Key,
+  Lock,
+  Plus,
+  Shield,
+  Trash2,
+} from "lucide-react"
 import {
   Card,
   CardContent,
@@ -5,44 +15,106 @@ import {
   CardHeader,
   CardTitle,
 } from "~/components/ui/card"
-import { getUserDisplayName, useAuth } from "~/lib/auth-context"
-import { Copy, Eye, Trash2, Bell, Lock, Shield } from "lucide-react"
 import { Button } from "~/components/ui/button"
-
-const apiKeys = [
-  {
-    id: 1,
-    name: "Production API",
-    created: "Jan 12, 2024",
-    lastUsed: "5m ago",
-    status: "active",
-  },
-  {
-    id: 2,
-    name: "Webhook Integration",
-    created: "Dec 28, 2023",
-    lastUsed: "2h ago",
-    status: "active",
-  },
-  {
-    id: 3,
-    name: "Old Staging Key",
-    created: "Nov 15, 2023",
-    lastUsed: "Never",
-    status: "revoked",
-  },
-]
+import { Input } from "~/components/ui/input"
+import {
+  Dialog,
+  DialogClose,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "~/components/ui/dialog"
+import { getUserDisplayName, useAuth } from "~/lib/auth-context"
+import { api, type ApiKey, type CreatedApiKey } from "~/lib/api"
 
 export default function Settings() {
   const { user } = useAuth()
   const displayName = getUserDisplayName(user)
+
+  const [keys, setKeys] = useState<ApiKey[]>([])
+  const [loading, setLoading] = useState(true)
+
+  const loadKeys = useCallback(async () => {
+    setLoading(true)
+    try {
+      const data = await api.settings.listApiKeys()
+      setKeys(data)
+    } catch {
+      /* ignore */
+    }
+    setLoading(false)
+  }, [])
+
+  useEffect(() => {
+    loadKeys()
+  }, [loadKeys])
+
+  const [createOpen, setCreateOpen] = useState(false)
+  const [newKeyName, setNewKeyName] = useState("")
+  const [creating, setCreating] = useState(false)
+  const [createdKey, setCreatedKey] = useState<CreatedApiKey | null>(null)
+  const [copied, setCopied] = useState(false)
+
+  const createKey = async () => {
+    if (!newKeyName.trim()) return
+    setCreating(true)
+    try {
+      const created = await api.settings.createApiKey(newKeyName.trim())
+      setCreatedKey(created)
+      setNewKeyName("")
+      await loadKeys()
+    } catch {
+      /* ignore */
+    }
+    setCreating(false)
+  }
+
+  const copyKey = async () => {
+    if (!createdKey) return
+    try {
+      await navigator.clipboard.writeText(createdKey.raw_key)
+      setCopied(true)
+      setTimeout(() => setCopied(false), 2000)
+    } catch {
+      /* ignore */
+    }
+  }
+
+  const closeCreate = () => {
+    setCreateOpen(false)
+    setCreatedKey(null)
+    setNewKeyName("")
+    setCopied(false)
+  }
+
+  const [revokeId, setRevokeId] = useState<string | null>(null)
+  const [revoking, setRevoking] = useState(false)
+
+  const confirmRevoke = async () => {
+    if (!revokeId) return
+    setRevoking(true)
+    try {
+      await api.settings.revokeApiKey(revokeId)
+      setRevokeId(null)
+      await loadKeys()
+    } catch {
+      /* ignore */
+    }
+    setRevoking(false)
+  }
+
+  const activeKeys = keys.filter((k) => !k.revoked)
+  const revokedKeys = keys.filter((k) => k.revoked)
 
   return (
     <div className="space-y-6">
       <div>
         <h1 className="text-3xl font-bold dark:text-white">Settings</h1>
         <p className="mt-2 text-zinc-600 dark:text-zinc-400">
-          Tune account, API, workspace defaults
+          Account, API keys, and preferences
         </p>
       </div>
 
@@ -79,64 +151,131 @@ export default function Settings() {
               </p>
             </div>
           </div>
-          <div className="flex gap-2">
-            <Button className="rounded bg-orange-500 px-3 py-2 text-sm font-medium text-white hover:bg-orange-600">
-              Change Password
-            </Button>
-            <Button className="rounded bg-zinc-100 px-3 py-2 text-sm font-medium text-zinc-900 hover:bg-zinc-200 dark:bg-zinc-800 dark:text-zinc-100 dark:hover:bg-zinc-700">
-              Edit Profile
-            </Button>
-          </div>
         </CardContent>
       </Card>
 
       <Card>
         <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Lock className="h-5 w-5" />
-            API Keys
-          </CardTitle>
-          <CardDescription>Manage authentication tokens</CardDescription>
+          <div className="flex items-center justify-between">
+            <div>
+              <CardTitle className="flex items-center gap-2">
+                <Key className="h-5 w-5" />
+                API Keys
+              </CardTitle>
+              <CardDescription>
+                Manage authentication tokens for programmatic access
+              </CardDescription>
+            </div>
+            <Dialog open={createOpen} onOpenChange={setCreateOpen}>
+              <DialogTrigger asChild>
+                <Button className="rounded bg-orange-500 px-3 py-2 text-sm font-medium text-white hover:bg-orange-600">
+                  <Plus className="mr-1 h-4 w-4" />
+                  New Key
+                </Button>
+              </DialogTrigger>
+              {!createdKey ? (
+                <DialogContent className="sm:max-w-md">
+                  <DialogHeader>
+                    <DialogTitle>Create API Key</DialogTitle>
+                    <DialogDescription>
+                      Give your key a name so you can identify it later.
+                    </DialogDescription>
+                  </DialogHeader>
+                  <div className="flex items-center gap-2">
+                    <Input
+                      value={newKeyName}
+                      onChange={(e) => setNewKeyName(e.target.value)}
+                      placeholder="e.g. Production CI"
+                      className="flex-1"
+                      onKeyDown={(e) =>
+                        e.key === "Enter" && !creating && createKey()
+                      }
+                    />
+                    <Button
+                      onClick={createKey}
+                      disabled={creating || !newKeyName.trim()}
+                    >
+                      {creating ? "Creating..." : "Create"}
+                    </Button>
+                  </div>
+                </DialogContent>
+              ) : (
+                <DialogContent className="sm:max-w-md">
+                  <DialogHeader>
+                    <DialogTitle>Key Created</DialogTitle>
+                    <DialogDescription>
+                      Copy this key now. You won't be able to see it again.
+                    </DialogDescription>
+                  </DialogHeader>
+                  <div className="space-y-3">
+                    <p className="text-sm font-medium">
+                      {createdKey.key.name}
+                    </p>
+                    <div className="flex items-center gap-2 rounded border border-zinc-200 bg-zinc-50 p-3 dark:border-zinc-700 dark:bg-zinc-900">
+                      <code className="flex-1 break-all font-mono text-xs">
+                        {createdKey.raw_key}
+                      </code>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-8 w-8 shrink-0"
+                        onClick={copyKey}
+                      >
+                        <Copy className="h-4 w-4" />
+                      </Button>
+                    </div>
+                    {copied && (
+                      <p className="text-xs text-green-600">Copied!</p>
+                    )}
+                  </div>
+                  <DialogFooter>
+                    <DialogClose asChild>
+                      <Button variant="outline" onClick={closeCreate}>
+                        Done
+                      </Button>
+                    </DialogClose>
+                  </DialogFooter>
+                </DialogContent>
+              )}
+            </Dialog>
+          </div>
         </CardHeader>
         <CardContent>
-          <div className="space-y-3">
-            {apiKeys.map((key) => (
-              <div
-                key={key.id}
-                className="flex items-center justify-between rounded-lg border border-zinc-200 p-3 hover:bg-zinc-50 dark:border-zinc-800 dark:hover:bg-zinc-800/50"
-              >
-                <div className="min-w-0 flex-1">
-                  <p className="text-sm font-medium">{key.name}</p>
-                  <p className="mt-0.5 text-xs text-zinc-600 dark:text-zinc-400">
-                    Created {key.created} • Last used {key.lastUsed}
-                  </p>
-                </div>
-                <span
-                  className={`rounded px-2 py-1 text-xs font-medium ${
-                    key.status === "active"
-                      ? "bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400"
-                      : "bg-gray-100 text-gray-800 dark:bg-gray-900/30 dark:text-gray-400"
-                  }`}
-                >
-                  {key.status}
-                </span>
-                <div className="ml-3 flex gap-1">
-                  <Button variant="ghost" size="icon">
-                    <Eye className="h-4 w-4" />
-                  </Button>
-                  <Button variant="ghost" size="icon">
-                    <Copy className="h-4 w-4" />
-                  </Button>
-                  <Button variant="destructive" size="icon">
-                    <Trash2 className="h-4 w-4" />
-                  </Button>
-                </div>
-              </div>
-            ))}
-          </div>
-          <Button className="mt-4 w-full rounded bg-zinc-100 px-3 py-2 text-sm font-medium text-zinc-900 hover:bg-zinc-200 dark:bg-zinc-800 dark:text-zinc-100 dark:hover:bg-zinc-700">
-            Generate New Key
-          </Button>
+          {loading ? (
+            <div className="flex items-center justify-center py-8">
+              <p className="text-sm text-zinc-500">Loading...</p>
+            </div>
+          ) : keys.length === 0 ? (
+            <div className="flex flex-col items-center gap-2 py-8">
+              <Key className="h-8 w-8 text-zinc-400" />
+              <p className="text-sm text-zinc-500">No API keys yet</p>
+              <p className="text-xs text-zinc-500">
+                Create one to access the API programmatically
+              </p>
+            </div>
+          ) : (
+            <div className="space-y-3">
+              {activeKeys.map((key) => (
+                <KeyRow
+                  key={key.id}
+                  apiKey={key}
+                  onRevoke={() => setRevokeId(key.id)}
+                />
+              ))}
+              {revokedKeys.length > 0 && (
+                <>
+                  <div className="pt-4">
+                    <p className="text-xs font-medium uppercase tracking-wide text-zinc-500">
+                      Revoked
+                    </p>
+                  </div>
+                  {revokedKeys.map((key) => (
+                    <KeyRow key={key.id} apiKey={key} onRevoke={() => {}} />
+                  ))}
+                </>
+              )}
+            </div>
+          )}
         </CardContent>
       </Card>
 
@@ -184,7 +323,9 @@ export default function Settings() {
           <CardContent className="space-y-3">
             <div className="flex items-center justify-between rounded border border-zinc-200 p-2 dark:border-zinc-800">
               <span className="text-sm">Two-factor authentication</span>
-              <span className="text-xs font-medium text-orange-600">Setup</span>
+              <span className="text-xs font-medium text-orange-600">
+                Setup
+              </span>
             </div>
             <div className="flex items-center justify-between rounded border border-zinc-200 p-2 dark:border-zinc-800">
               <span className="text-sm">Session timeout</span>
@@ -201,6 +342,82 @@ export default function Settings() {
           </CardContent>
         </Card>
       </div>
+
+      <Dialog
+        open={revokeId !== null}
+        onOpenChange={(open) => {
+          if (!open) setRevokeId(null)
+        }}
+      >
+        <DialogContent className="sm:max-w-sm">
+          <DialogHeader>
+            <DialogTitle>Revoke API Key</DialogTitle>
+            <DialogDescription>
+              This will permanently invalidate this key. Any services using it
+              will lose access immediately.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter className="gap-2">
+            <Button variant="outline" onClick={() => setRevokeId(null)}>
+              Cancel
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={confirmRevoke}
+              disabled={revoking}
+            >
+              {revoking ? "Revoking..." : "Revoke"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </div>
+  )
+}
+
+function KeyRow({
+  apiKey,
+  onRevoke,
+}: {
+  apiKey: ApiKey
+  onRevoke: () => void
+}) {
+  return (
+    <div className="flex items-center justify-between rounded-lg border border-zinc-200 p-3 hover:bg-zinc-50 dark:border-zinc-800 dark:hover:bg-zinc-800/50">
+      <div className="min-w-0 flex-1">
+        <p className="text-sm font-medium">{apiKey.name}</p>
+        <p className="mt-0.5 text-xs text-zinc-600 dark:text-zinc-400">
+          <span className="font-mono">{apiKey.prefix}...</span>
+          <span className="mx-1.5">·</span>
+          Created {new Date(apiKey.created_at).toLocaleDateString()}
+          {apiKey.last_used_at && (
+            <>
+              <span className="mx-1.5">·</span>
+              Last used{" "}
+              {new Date(apiKey.last_used_at).toLocaleDateString()}
+            </>
+          )}
+        </p>
+      </div>
+      <span
+        className={`rounded px-2 py-1 text-xs font-medium ${
+          apiKey.revoked
+            ? "bg-zinc-100 text-zinc-500 dark:bg-zinc-900/30 dark:text-zinc-500"
+            : "bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400"
+        }`}
+      >
+        {apiKey.revoked ? "Revoked" : "Active"}
+      </span>
+      {!apiKey.revoked && (
+        <Button
+          variant="ghost"
+          size="icon"
+          className="ml-3 h-8 w-8"
+          onClick={onRevoke}
+        >
+          <Trash2 className="h-4 w-4 text-red-400" />
+        </Button>
+      )}
     </div>
   )
 }

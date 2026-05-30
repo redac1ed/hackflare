@@ -15,6 +15,7 @@ use sqlx::{
 use crate::{
     config::Config,
     services::{
+        api_keys::ApiKeysService,
         config_overrides::ConfigOverridesService,
         user_sessions::UserSessionsService,
         users::UsersService,
@@ -31,6 +32,7 @@ pub struct AppState {
     pub dns_authority: Arc<AuthorityStore>,
 
     // -- services --
+    pub(crate) api_keys: ApiKeysService,
     pub(crate) users: UsersService,
     pub(crate) user_sessions: UserSessionsService,
     pub(crate) config_overrides: ConfigOverridesService,
@@ -131,6 +133,7 @@ impl AppState {
         let users = UsersService::new(db.clone());
         let user_sessions = UserSessionsService::new(db.clone());
         let config_overrides = ConfigOverridesService::new(db.clone());
+        let api_keys = ApiKeysService::new(db.clone());
 
         let persistence: Arc<dyn ZonePersistence> = Arc::new(PostgresPersistence::new(db.clone()));
         let dns_authority = Arc::new(AuthorityStore::with_persistence(
@@ -145,6 +148,7 @@ impl AppState {
             http_client,
             db,
             dns_authority,
+            api_keys,
             users,
             user_sessions,
             config_overrides,

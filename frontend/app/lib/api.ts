@@ -68,6 +68,20 @@ export interface AdminStats {
   total_sessions: number
 }
 
+export interface ApiKey {
+  id: string
+  name: string
+  prefix: string
+  created_at: string
+  last_used_at: string | null
+  revoked: boolean
+}
+
+export interface CreatedApiKey {
+  key: ApiKey
+  raw_key: string
+}
+
 interface ApiError {
   error: string
   status: number
@@ -237,6 +251,21 @@ export const api = {
 
   sessions: {
     list: () => request<UserSession[]>("/api/v1/sessions"),
+  },
+
+  settings: {
+    listApiKeys: () => request<ApiKey[]>("/api/v1/settings/api-keys"),
+
+    createApiKey: (name: string) =>
+      request<CreatedApiKey>("/api/v1/settings/api-keys", {
+        method: "POST",
+        body: { name },
+      }),
+
+    revokeApiKey: (id: string) =>
+      request<void>(`/api/v1/settings/api-keys/${id}`, {
+        method: "DELETE",
+      }),
   },
 
   admin: {

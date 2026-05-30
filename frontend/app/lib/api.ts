@@ -40,6 +40,34 @@ export interface HealthResponse {
   dns_zones: number
 }
 
+export interface ConfigEntry {
+  key: string
+  label: string
+  description: string
+  env_value: string | null
+  override_value: string | null
+  effective_value: string
+  editable: boolean
+  requires_restart: boolean
+  updated_at: string | null
+  updated_by: string | null
+}
+
+export interface AdminUser {
+  id: string
+  email: string
+  first_name: string
+  last_name: string
+  status: string
+  created_at: string
+}
+
+export interface AdminStats {
+  total_users: number
+  total_zones: number
+  total_sessions: number
+}
+
 interface ApiError {
   error: string
   status: number
@@ -209,6 +237,25 @@ export const api = {
 
   sessions: {
     list: () => request<UserSession[]>("/api/v1/sessions"),
+  },
+
+  admin: {
+    listConfig: () => request<ConfigEntry[]>("/api/v1/admin/config"),
+
+    upsertConfig: (key: string, value: string) =>
+      request<void>(`/api/v1/admin/config/${encodeURIComponent(key)}`, {
+        method: "PUT",
+        body: { value },
+      }),
+
+    deleteConfig: (key: string) =>
+      request<void>(`/api/v1/admin/config/${encodeURIComponent(key)}`, {
+        method: "DELETE",
+      }),
+
+    listUsers: () => request<AdminUser[]>("/api/v1/admin/users"),
+
+    getStats: () => request<AdminStats>("/api/v1/admin/stats"),
   },
 
   slack: {

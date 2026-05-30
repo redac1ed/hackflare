@@ -145,8 +145,9 @@ jobs:
               -t "$TAG" \
               "$IMAGE:${TAG_PART}-amd64"
           done <<< "$TAGS"
+  
   coolify-webhook:
-    needs: merge-manifest
+    needs: publish
     runs-on: ubuntu-latest
     steps:
       - name: Deploy to Coolify

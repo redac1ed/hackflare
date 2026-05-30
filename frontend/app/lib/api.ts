@@ -210,4 +210,12 @@ export const api = {
   sessions: {
     list: () => request<UserSession[]>("/api/v1/sessions"),
   },
+
+  slack: {
+    contact: (text: string) =>
+      request<void>("/api/v1/slack/contact", {
+        method: "POST",
+        body: { text },
+      }),
+  },
 }

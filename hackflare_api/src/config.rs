@@ -99,6 +99,7 @@ pub struct Config {
     pub(crate) jwt_encoding_key: EncodingKey,
     pub(crate) jwt_decoding_key: DecodingKey,
     pub(crate) hca: HcaConfig,
+    pub(crate) slack_webhook_url: Option<Url>,
     pub(crate) session_inactivity_minutes: i64,
     pub(crate) access_token_minutes: i64,
     pub(crate) refresh_token_days: i64,
@@ -159,6 +160,13 @@ pub fn from_env() -> Result<Config> {
             client_secret: env_req("API_HCA_CLIENT_SECRET")?,
             redirect_uri,
         },
+        slack_webhook_url: env::var("SLACK_WEBHOOK_URL").ok().map(|u| {
+            Url::parse(&u).unwrap_or_else(|e| {
+                warn!("invalid SLACK_WEBHOOK_URL: {e}");
+                // Use a placeholder so it doesn't crash — the endpoint will return 500
+                Url::parse("https://hooks.slack.com/services/placeholder").unwrap()
+            })
+        }),
         session_inactivity_minutes: env_or("API_SESSION_INACTIVITY_MINUTES", 15i64)?,
         access_token_minutes: env_or("API_ACCESS_TOKEN_MINUTES", 15i64)?,
         refresh_token_days: env_or("API_REFRESH_TOKEN_DAYS", 30i64)?,

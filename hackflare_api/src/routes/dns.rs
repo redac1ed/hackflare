@@ -405,6 +405,7 @@ mod tests {
                     client_secret: "test".into(),
                     redirect_uri: Url::parse("http://localhost:3000/callback").ok()?,
                 },
+                slack_webhook_url: None,
                 session_inactivity_minutes: 15,
                 access_token_minutes: 15,
                 refresh_token_days: 30,

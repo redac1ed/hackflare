@@ -21,6 +21,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "~/components/ui/select"
+import { api } from "~/lib/api"
 import { useAuth } from "~/lib/auth-context"
 
 const defaultForm = {
@@ -51,14 +52,9 @@ export default function Help() {
       const categoryLabel = form.category
         ? `*Category:* ${form.category}\n`
         : ""
-      const res = await fetch("/api/v1/slack/contact", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          text: `📬 *New HackFlare Support Request*\n*From:* ${userMention} id: \`${id}\`\n${categoryLabel}*Message:*\n${form.message}`,
-        }),
-      })
-      if (!res.ok) throw new Error("Failed to send")
+      await api.slack.contact(
+        `📬 *New HackFlare Support Request*\n*From:* ${userMention} id: \`${id}\`\n${categoryLabel}*Message:*\n${form.message}`
+      )
       setSuccess(true)
       setForm(defaultForm)
       setTimeout(() => {

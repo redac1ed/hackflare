@@ -54,21 +54,18 @@ struct UpdateRecordRequest {
 // ── Helpers ──
 
 async fn is_zone_verified(db: &PgPool, zone_name: &str) -> Result<bool, sqlx::Error> {
-    let row: Option<(bool,)> =
-        sqlx::query_as("SELECT ns_verified FROM dns_zones WHERE name = $1")
-            .bind(zone_name)
-            .fetch_optional(db)
-            .await?;
+    let row: Option<(bool,)> = sqlx::query_as("SELECT ns_verified FROM dns_zones WHERE name = $1")
+        .bind(zone_name)
+        .fetch_optional(db)
+        .await?;
     Ok(row.map(|r| r.0).unwrap_or(false))
 }
 
 async fn set_zone_verified(db: &PgPool, zone_name: &str) -> Result<(), sqlx::Error> {
-    sqlx::query(
-        "UPDATE dns_zones SET ns_verified = true, updated_at = now() WHERE name = $1",
-    )
-    .bind(zone_name)
-    .execute(db)
-    .await?;
+    sqlx::query("UPDATE dns_zones SET ns_verified = true, updated_at = now() WHERE name = $1")
+        .bind(zone_name)
+        .execute(db)
+        .await?;
     Ok(())
 }
 
@@ -261,7 +258,10 @@ async fn create_record(
     }
 
     // Block record edits until NS delegation is verified
-    if !is_zone_verified(&state.db, &zone_name).await.unwrap_or(false) {
+    if !is_zone_verified(&state.db, &zone_name)
+        .await
+        .unwrap_or(false)
+    {
         return (
             StatusCode::FORBIDDEN,
             Json(serde_json::json!({"error": "zone not verified, record edits are blocked until NS delegation is verified"})),
@@ -304,7 +304,10 @@ async fn update_record(
     Json(req): Json<UpdateRecordRequest>,
 ) -> impl IntoResponse {
     // Block record edits until NS delegation is verified
-    if !is_zone_verified(&state.db, &zone_name).await.unwrap_or(false) {
+    if !is_zone_verified(&state.db, &zone_name)
+        .await
+        .unwrap_or(false)
+    {
         return (
             StatusCode::FORBIDDEN,
             Json(serde_json::json!({"error": "zone not verified, record edits are blocked until NS delegation is verified"})),
@@ -327,7 +330,11 @@ async fn update_record(
         .dns_authority
         .add_record(&zone_name, &record_name, &record_type, req.ttl, &req.value)
         .await;
-    (StatusCode::OK, Json(serde_json::json!({"status": "updated"}))).into_response()
+    (
+        StatusCode::OK,
+        Json(serde_json::json!({"status": "updated"})),
+    )
+        .into_response()
 }
 
 async fn delete_record(
@@ -339,7 +346,10 @@ async fn delete_record(
     )>,
 ) -> impl IntoResponse {
     // Block record edits until NS delegation is verified
-    if !is_zone_verified(&state.db, &zone_name).await.unwrap_or(false) {
+    if !is_zone_verified(&state.db, &zone_name)
+        .await
+        .unwrap_or(false)
+    {
         return (
             StatusCode::FORBIDDEN,
             Json(serde_json::json!({"error": "zone not verified, record edits are blocked until NS delegation is verified"})),
@@ -798,7 +808,10 @@ mod tests {
         };
 
         // Create zone (starts unverified)
-        ctx.state.dns_authority.create_zone("test-unverified.com").await;
+        ctx.state
+            .dns_authority
+            .create_zone("test-unverified.com")
+            .await;
 
         // Create record should be blocked
         let response = build_router(ctx.state.clone())
@@ -812,7 +825,10 @@ mod tests {
         assert_eq!(response.status(), StatusCode::FORBIDDEN);
 
         // Update record should be blocked
-        ctx.state.dns_authority.add_record("test-unverified.com", "www", "A", 300, "1.2.3.4").await;
+        ctx.state
+            .dns_authority
+            .add_record("test-unverified.com", "www", "A", 300, "1.2.3.4")
+            .await;
         let response = build_router(ctx.state.clone())
             .oneshot(ctx.authed_request(
                 "PUT",
@@ -834,7 +850,11 @@ mod tests {
             .unwrap();
         assert_eq!(response.status(), StatusCode::FORBIDDEN);
 
-        let _ = ctx.state.dns_authority.delete_zone("test-unverified.com").await;
+        let _ = ctx
+            .state
+            .dns_authority
+            .delete_zone("test-unverified.com")
+            .await;
         ctx.cleanup().await;
     }
 

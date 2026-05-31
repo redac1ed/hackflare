@@ -2,8 +2,6 @@
 
 Feel free to submit PRs/issues for anything you want us to work on or you want to work on.
 
-> IMPORTANT  
-> NOTE: THIS IS ONLY EMPTY DUE TO THE REFACTOR WE HAVE BEEN DOING
 
 ### Phase 1 (MVP/POC)
 
@@ -40,7 +38,7 @@ Feel free to submit PRs/issues for anything you want us to work on or you want t
   - [ ] Notifications
   - [x] Admin Panel
   - [x] Settings
-  - [ ] Error Pages
+  - [x] Error Pages
   - [x] Auth System
 - [x] Docker
 - [ ] Big Haj on error pages

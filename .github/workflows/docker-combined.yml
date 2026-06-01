@@ -111,9 +111,6 @@ jobs:
       contents: read
       packages: write
     steps:
-      - name: Setup Blacksmith Builder
-        uses: useblacksmith/setup-docker-builder@v1
-
       - name: Log in to the Container registry
         uses: docker/login-action@v4
         with:

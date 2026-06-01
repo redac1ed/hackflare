@@ -57,7 +57,7 @@ pub(super) async fn list_query_logs(
         r#"
         SELECT id, query_name, query_type, response_code, response_size, source_ip, processing_us
         FROM dns_query_logs
-        WHERE created_at >= now() - interval '24 hours'
+        WHERE timestamp >= now() - interval '24 hours'
         ORDER BY id DESC
         LIMIT 200
         "#,
@@ -72,9 +72,9 @@ pub(super) async fn list_query_logs(
     let summary = sqlx::query_as::<_, (i64, i64, i64)>(
         r#"
         SELECT
-            COUNT(*) FILTER (WHERE response_code NOT IN ('NOERROR', 'NXDOMAIN') AND created_at >= now()::date) AS errors_today,
-            COUNT(*) FILTER (WHERE response_code = 'NXDOMAIN' AND created_at >= now()::date) AS warnings_today,
-            COUNT(*) FILTER (WHERE response_code = 'NOERROR' AND created_at >= now()::date) AS info_today
+            COUNT(*) FILTER (WHERE response_code NOT IN ('NOERROR', 'NXDOMAIN') AND timestamp >= now()::date) AS errors_today,
+            COUNT(*) FILTER (WHERE response_code = 'NXDOMAIN' AND timestamp >= now()::date) AS warnings_today,
+            COUNT(*) FILTER (WHERE response_code = 'NOERROR' AND timestamp >= now()::date) AS info_today
         FROM dns_query_logs
         "#,
     )

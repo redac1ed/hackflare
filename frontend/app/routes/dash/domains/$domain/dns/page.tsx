@@ -30,6 +30,7 @@ import { Label } from "~/components/ui/label"
 import { DataTable } from "./data-table"
 import { useColumns, type DnsRecord } from "./columns"
 import { api, type DnsZone } from "~/lib/api"
+import { useToast } from "~/lib/toast"
 
 const defaultForm = {
   name: "",
@@ -41,6 +42,7 @@ const defaultForm = {
 export default function Dns() {
   const { domain } = useParams<{ domain: string }>()
   const navigate = useNavigate()
+  const { toast } = useToast()
   const [records, setRecords] = useState<DnsRecord[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -48,14 +50,12 @@ export default function Dns() {
   const [nsVerifiedLoaded, setNsVerifiedLoaded] = useState(false)
   const [open, setOpen] = useState(false)
   const [adding, setAdding] = useState(false)
-  const [addError, setAddError] = useState<string | null>(null)
   const [form, setForm] = useState(defaultForm)
   const [deleteConfirm, setDeleteConfirm] = useState<DnsRecord | null>(null)
   const [deleting, setDeleting] = useState<string | null>(null)
   const [editing, setEditing] = useState<DnsRecord | null>(null)
   const [editForm, setEditForm] = useState(defaultForm)
   const [saving, setSaving] = useState(false)
-  const [editError, setEditError] = useState<string | null>(null)
 
   const fetchRecords = async () => {
     if (!domain) return
@@ -76,6 +76,7 @@ export default function Dns() {
           ? String((err as { error: unknown }).error)
           : "Failed to load DNS records"
       setError(msg)
+      toast(msg, "error")
     } finally {
       setLoading(false)
     }
@@ -94,7 +95,6 @@ export default function Dns() {
   const handleAdd = async () => {
     if (!form.name || !form.value || !domain) return
     setAdding(true)
-    setAddError(null)
     try {
       await api.dns.createRecord(domain, {
         name: form.name,
@@ -104,13 +104,14 @@ export default function Dns() {
       })
       setForm(defaultForm)
       setOpen(false)
+      toast("Record added", "success")
       await fetchRecords()
     } catch (err) {
       const msg =
         err && typeof err === "object" && "error" in err
           ? String((err as { error: unknown }).error)
           : "Failed to add record"
-      setAddError(msg)
+      toast(msg, "error")
     } finally {
       setAdding(false)
     }
@@ -126,13 +127,14 @@ export default function Dns() {
     setDeleteConfirm(null)
     try {
       await api.dns.deleteRecord(domain, deleteConfirm.name, deleteConfirm.type)
+      toast("Record deleted", "success")
       await fetchRecords()
     } catch (err) {
       const msg =
         err && typeof err === "object" && "error" in err
           ? String((err as { error: unknown }).error)
           : "Failed to delete record"
-      setError(msg)
+      toast(msg, "error")
     } finally {
       setDeleting(null)
     }
@@ -146,26 +148,25 @@ export default function Dns() {
       value: record.value,
       ttl: record.ttl,
     })
-    setEditError(null)
   }
 
   const handleSaveEdit = async () => {
     if (!domain || !editing) return
     setSaving(true)
-    setEditError(null)
     try {
       await api.dns.updateRecord(domain, editing.name, editing.type, {
         value: editForm.value,
         ttl: editForm.ttl,
       })
       setEditing(null)
+      toast("Record updated", "success")
       await fetchRecords()
     } catch (err) {
       const msg =
         err && typeof err === "object" && "error" in err
           ? String((err as { error: unknown }).error)
           : "Failed to update record"
-      setEditError(msg)
+      toast(msg, "error")
     } finally {
       setSaving(false)
     }
@@ -205,11 +206,6 @@ export default function Dns() {
             </DialogHeader>
 
             <div className="space-y-4 py-2">
-              {addError && (
-                <div className="rounded bg-red-100 px-3 py-2 text-sm text-red-800 dark:bg-red-900/30 dark:text-red-400">
-                  {addError}
-                </div>
-              )}
               <div className="space-y-2">
                 <Label>Type</Label>
                 <Select
@@ -297,11 +293,6 @@ export default function Dns() {
             </DialogHeader>
 
             <div className="space-y-4 py-2">
-              {editError && (
-                <div className="rounded bg-red-100 px-3 py-2 text-sm text-red-800 dark:bg-red-900/30 dark:text-red-400">
-                  {editError}
-                </div>
-              )}
               <div className="space-y-2">
                 <Label>Type</Label>
                 <Select

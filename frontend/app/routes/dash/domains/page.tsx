@@ -3,6 +3,7 @@ import { NavLink, useNavigate } from "react-router"
 import { useEffect, useState } from "react"
 import { api, type DnsZone } from "~/lib/api"
 import { Button } from "~/components/ui/button"
+import { useToast } from "~/lib/toast"
 import {
   Card,
   CardContent,
@@ -31,15 +32,14 @@ import { Input } from "~/components/ui/input"
 import { Label } from "~/components/ui/label"
 
 export default function Domains() {
+  const { toast } = useToast()
   const [zones, setZones] = useState<DnsZone[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [open, setOpen] = useState(false)
   const [domainInput, setDomainInput] = useState("")
   const [adding, setAdding] = useState(false)
-  const [addError, setAddError] = useState<string | null>(null)
   const [verifying, setVerifying] = useState<Record<string, boolean>>({})
-  const [verifyMsg, setVerifyMsg] = useState<Record<string, string>>({})
   const [deleteTarget, setDeleteTarget] = useState<string | null>(null)
   const [deleting, setDeleting] = useState(false)
 
@@ -55,6 +55,7 @@ export default function Domains() {
           ? String((err as { error: unknown }).error)
           : "Failed to load domains"
       setError(msg)
+      toast(msg, "error")
     } finally {
       setLoading(false)
     }
@@ -69,18 +70,18 @@ export default function Domains() {
     if (!name) return
 
     setAdding(true)
-    setAddError(null)
     try {
       await api.dns.createZone(name)
       setDomainInput("")
       setOpen(false)
+      toast("Domain added", "success")
       await fetchZones()
     } catch (err) {
       const msg =
         err && typeof err === "object" && "error" in err
           ? String((err as { error: unknown }).error)
           : "Failed to add domain"
-      setAddError(msg)
+      toast(msg, "error")
     } finally {
       setAdding(false)
     }
@@ -88,24 +89,20 @@ export default function Domains() {
 
   const handleVerify = async (zoneName: string) => {
     setVerifying((prev) => ({ ...prev, [zoneName]: true }))
-    setVerifyMsg((prev) => ({ ...prev, [zoneName]: "" }))
     try {
       const result = await api.dns.verifyZone(zoneName)
-      setVerifyMsg((prev) => ({
-        ...prev,
-        [zoneName]: result.verified
-          ? "Verified!"
-          : result.message || "Verification failed",
-      }))
       if (result.verified) {
+        toast("Zone verified", "success")
         await fetchZones()
+      } else {
+        toast(result.message || "Verification failed", "error")
       }
     } catch (err) {
       const msg =
         err && typeof err === "object" && "error" in err
           ? String((err as { error: unknown }).error)
           : "Verification request failed"
-      setVerifyMsg((prev) => ({ ...prev, [zoneName]: msg }))
+      toast(msg, "error")
     } finally {
       setVerifying((prev) => ({ ...prev, [zoneName]: false }))
     }
@@ -117,13 +114,14 @@ export default function Domains() {
     try {
       await api.dns.deleteZone(deleteTarget)
       setDeleteTarget(null)
+      toast("Domain deleted", "success")
       await fetchZones()
     } catch (err) {
       const msg =
         err && typeof err === "object" && "error" in err
           ? String((err as { error: unknown }).error)
           : "Failed to delete domain"
-      setError(msg)
+      toast(msg, "error")
     } finally {
       setDeleting(false)
     }
@@ -155,11 +153,6 @@ export default function Domains() {
               </DialogDescription>
             </DialogHeader>
             <div className="space-y-4 py-2">
-              {addError && (
-                <div className="rounded bg-red-100 px-3 py-2 text-sm text-red-800 dark:bg-red-900/30 dark:text-red-400">
-                  {addError}
-                </div>
-              )}
               <div className="space-y-2">
                 <Label htmlFor="domain">Domain name</Label>
                 <Input
@@ -336,11 +329,6 @@ export default function Domains() {
                                   "Verify"
                                 )}
                               </Button>
-                            )}
-                            {verifyMsg[zone.name] && (
-                              <span className="text-xs text-zinc-500 max-w-40 truncate">
-                                {verifyMsg[zone.name]}
-                              </span>
                             )}
                             <Button
                               size="sm"

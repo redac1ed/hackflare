@@ -10,6 +10,7 @@ import {
 import type { Route } from "./+types/root"
 import { DarkModeProvider } from "./components/dark-mode-provider"
 import { AuthProvider } from "./lib/auth-context"
+import { ToastProvider } from "./lib/toast"
 import "./app.css"
 
 export function Layout({ children }: { children: React.ReactNode }) {
@@ -46,7 +47,9 @@ export default function App() {
   return (
     <AuthProvider>
       <DarkModeProvider>
-        <Outlet />
+        <ToastProvider>
+          <Outlet />
+        </ToastProvider>
       </DarkModeProvider>
     </AuthProvider>
   )

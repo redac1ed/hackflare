@@ -1,11 +1,13 @@
 import { useEffect, useState } from "react"
 import { useSearchParams, useNavigate } from "react-router"
 import { useAuth } from "~/lib/auth-context"
+import { useToast } from "~/lib/toast"
 
 export default function HackclubCallback() {
   const [searchParams] = useSearchParams()
   const navigate = useNavigate()
   const { refreshUser } = useAuth()
+  const { toast } = useToast()
   const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
@@ -20,6 +22,7 @@ export default function HackclubCallback() {
             userId: user.id,
             returnTo,
           })
+          toast("Signed in", "success")
           navigate(returnTo, { replace: true })
           return
         }

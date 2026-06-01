@@ -42,10 +42,12 @@ export default function Login() {
   }
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-zinc-50 dark:bg-zinc-950">
-      <Card className="w-full max-w-md">
+    <div className="relative flex min-h-screen items-center justify-center overflow-hidden bg-zinc-50 dark:bg-zinc-950">
+      <div className="absolute inset-0 bg-[linear-gradient(to_right,#80808012_1px,transparent_1px),linear-gradient(to_bottom,#80808012_1px,transparent_1px)] bg-size-[24px_24px]" />
+
+      <Card className="relative w-full max-w-md">
         <CardHeader>
-          <CardTitle>Hackflare</CardTitle>
+          <CardTitle>Welcome to HackFlare</CardTitle>
           <CardDescription>Sign in to manage your domains</CardDescription>
         </CardHeader>
         <CardContent>

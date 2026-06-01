@@ -3,7 +3,7 @@ use std::sync::Arc;
 use axum::{
     Router,
     extract::{Query, State},
-    http::header,
+    http::{HeaderValue, header},
     response::{IntoResponse, Redirect, Response},
     routing::{get, post},
 };
@@ -336,15 +336,20 @@ async fn callback_handler(
         .filter(|u| u.starts_with('/') && !u.contains("://") && !u.contains("\\"))
         .unwrap_or("/");
 
-    Ok((
-        StatusCode::FOUND,
-        [
-            (header::SET_COOKIE, access_cookie.to_string().as_str()),
-            (header::SET_COOKIE, refresh_cookie.to_string().as_str()),
-            (header::LOCATION, target_url),
-        ],
-    )
-        .into_response())
+    let mut response = (StatusCode::FOUND, ()).into_response();
+    response.headers_mut().append(
+        header::SET_COOKIE,
+        HeaderValue::from_str(&access_cookie.to_string()).unwrap(),
+    );
+    response.headers_mut().append(
+        header::SET_COOKIE,
+        HeaderValue::from_str(&refresh_cookie.to_string()).unwrap(),
+    );
+    response.headers_mut().append(
+        header::LOCATION,
+        HeaderValue::from_str(target_url).unwrap(),
+    );
+    Ok(response)
 }
 
 async fn logout_handler(
@@ -376,14 +381,16 @@ async fn logout_handler(
         is_secure,
     );
 
-    (
-        StatusCode::NO_CONTENT,
-        [
-            (header::SET_COOKIE, clear_access.to_string()),
-            (header::SET_COOKIE, clear_refresh.to_string()),
-        ],
-    )
-        .into_response()
+    let mut response = (StatusCode::NO_CONTENT, ()).into_response();
+    response.headers_mut().append(
+        header::SET_COOKIE,
+        HeaderValue::from_str(&clear_access.to_string()).unwrap(),
+    );
+    response.headers_mut().append(
+        header::SET_COOKIE,
+        HeaderValue::from_str(&clear_refresh.to_string()).unwrap(),
+    );
+    response
 }
 
 async fn refresh_handler(
@@ -441,14 +448,16 @@ async fn refresh_handler(
         is_secure,
     );
 
-    Ok((
-        StatusCode::OK,
-        [
-            (header::SET_COOKIE, access_cookie.to_string()),
-            (header::SET_COOKIE, refresh_cookie.to_string()),
-        ],
-    )
-        .into_response())
+    let mut response = (StatusCode::OK, ()).into_response();
+    response.headers_mut().append(
+        header::SET_COOKIE,
+        HeaderValue::from_str(&access_cookie.to_string()).unwrap(),
+    );
+    response.headers_mut().append(
+        header::SET_COOKIE,
+        HeaderValue::from_str(&refresh_cookie.to_string()).unwrap(),
+    );
+    Ok(response)
 }
 
 pub(super) fn routes(config: &Config) -> Router<AppState> {

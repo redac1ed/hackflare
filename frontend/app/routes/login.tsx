@@ -3,6 +3,8 @@ import { Navigate } from "react-router"
 import { useAuth } from "../lib/auth-context"
 import { api } from "../lib/api"
 import { HackClubIcon } from "../components/icons/hackclub"
+import { GoogleIcon } from "../components/icons/google"
+import { GitHubIcon } from "../components/icons/github"
 import {
   Card,
   CardContent,
@@ -74,7 +76,32 @@ export default function Login() {
             className="flex w-full items-center justify-center gap-2 rounded-lg bg-hackclub-500 py-2 text-sm font-medium text-white hover:bg-hackclub-600 disabled:bg-hackclub-400"
           >
             <HackClubIcon className="h-6 w-6" />
-            {loading ? "Redirecting..." : "Sign in with Hack Club"}
+            {loading ? "Redirecting\u2026" : "Sign in with Hack Club"}
+          </button>
+
+          <div className="relative my-4">
+            <div className="absolute inset-0 flex items-center">
+              <div className="w-full border-t border-zinc-200 dark:border-zinc-800" />
+            </div>
+            <div className="relative flex justify-center text-xs">
+              <span className="bg-card px-2 text-muted-foreground">or continue with</span>
+            </div>
+          </div>
+
+          <button
+            disabled
+            className="flex w-full items-center justify-center gap-2 rounded-lg border border-zinc-200 bg-white py-2 text-sm font-medium text-zinc-400 opacity-50 dark:border-zinc-800 dark:bg-zinc-900"
+          >
+            <GoogleIcon className="h-5 w-5" />
+            Sign in with Google
+          </button>
+
+          <button
+            disabled
+            className="mt-2 flex w-full items-center justify-center gap-2 rounded-lg border border-zinc-200 bg-white py-2 text-sm font-medium text-zinc-400 opacity-50 dark:border-zinc-800 dark:bg-zinc-900"
+          >
+            <GitHubIcon className="h-5 w-5" />
+            Sign in with GitHub
           </button>
         </CardContent>
       </Card>
